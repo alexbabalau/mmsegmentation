@@ -13,6 +13,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+data2/
 .eggs/
 lib/
 lib64/
@@ -118,3 +119,4 @@ mmseg/.mim
 
 # Pytorch
 *.pth
+archive.zip
