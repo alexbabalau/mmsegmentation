@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'ADE20KDataset'
-data_root = '/workspace/data2/ADEChallengeData2016'
+data_root = 'data2/ADEChallengeData2016'
 crop_size = (512, 512)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
@@ -40,7 +40,7 @@ tta_pipeline = [
         ])
 ]
 train_dataloader = dict(
-    batch_size=4,
+    batch_size=8,
     num_workers=1,
     persistent_workers=True,
     sampler=dict(type='InfiniteSampler', shuffle=True),
