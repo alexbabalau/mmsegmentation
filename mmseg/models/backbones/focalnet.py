@@ -20,6 +20,8 @@ from mmengine.model.weight_init import (constant_init, trunc_normal_,
 from mmengine.runner import CheckpointLoader
 from mmengine.utils import to_2tuple
 
+from ops_dcnv3 import modules as dcnv3
+
 
 class Mlp(BaseModule):
     """ Multilayer perceptron."""
@@ -54,7 +56,7 @@ class FocalModulation(BaseModule):
         use_postln (bool, default=False): Whether use post-modulation layernorm
     """
 
-    def __init__(self, dim, proj_drop=0., focal_level=2, focal_window=7, focal_factor=2, use_postln=False,init_cfg=None):
+    def __init__(self, dim, proj_drop=0., focal_level=2, focal_window=7, focal_factor=2, use_postln=False,init_cfg=None, core_op=None):
 
         super().__init__(init_cfg=init_cfg)
         self.dim = dim
@@ -79,12 +81,20 @@ class FocalModulation(BaseModule):
         for k in range(self.focal_level):
             kernel_size = self.focal_factor * k + self.focal_window
             self.focal_layers.append(
-                nn.Sequential(
-                    nn.Conv2d(dim, dim, kernel_size=kernel_size, stride=1, groups=dim,
-                              padding=kernel_size // 2, bias=False),
-                    nn.GELU(),
+                    core_op(
+                        channels=dim,
+                        kernel_size=kernel_size,
+                        stride=1,
+                        pad=kernel_size // 2,
+                        dilation=1,
+                        group=dim,
+                        offset_scale=1.0,
+                        act_layer='GELU',
+                        norm_layer=None,
+                        dw_kernel_size=None,  # for InternImage-H/G
+                        center_feature_scale=False,
+                        use_dcn_v4_op=False)  # for InternImage-H/G
                 )
-            )
 
     def forward(self, x):
         """ Forward function.
@@ -129,7 +139,7 @@ class FocalModulationBlock(BaseModule):
 
     def __init__(self, dim, mlp_ratio=4., drop=0., drop_path=0.,
                  act_layer=nn.GELU, norm_layer=nn.LayerNorm,
-                 focal_level=2, focal_window=9, use_layerscale=False, layerscale_value=1e-4, init_cfg=None):
+                 focal_level=2, focal_window=9, use_layerscale=False, layerscale_value=1e-4, init_cfg=None, core_op=None):
         super().__init__(init_cfg=init_cfg)
         self.dim = dim
         self.mlp_ratio = mlp_ratio
@@ -139,7 +149,7 @@ class FocalModulationBlock(BaseModule):
 
         self.norm1 = norm_layer(dim)
         self.modulation = FocalModulation(
-            dim, focal_window=self.focal_window, focal_level=self.focal_level, proj_drop=drop
+            dim, focal_window=self.focal_window, focal_level=self.focal_level, proj_drop=drop,core_op=core_op
         )
 
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
@@ -211,7 +221,8 @@ class BasicLayer(BaseModule):
                  use_conv_embed=False,
                  use_layerscale=False,
                  use_checkpoint=False,
-                 init_cfg=None
+                 init_cfg=None,
+                 core_op=None
                  ):
         super().__init__(init_cfg=init_cfg)
         self.depth = depth
@@ -227,7 +238,8 @@ class BasicLayer(BaseModule):
                 focal_window=focal_window,
                 focal_level=focal_level,
                 use_layerscale=use_layerscale,
-                norm_layer=norm_layer)
+                norm_layer=norm_layer,
+                core_op=core_op)
             for i in range(depth)])
 
         # patch merging layer
@@ -378,6 +390,7 @@ class FocalNet(BaseModule):
         self.patch_norm = patch_norm
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
+        self.core_op = getattr(dcnv3, 'DCNv3')
 
         if isinstance(pretrain_img_size, int):
             pretrain_img_size = to_2tuple(pretrain_img_size)
@@ -472,6 +485,8 @@ class FocalNet(BaseModule):
                     trunc_normal_init(m, std=.02, bias=0.)
                 elif isinstance(m, nn.LayerNorm):
                     constant_init(m, val=1.0, bias=0.)
+                elif isinstance(m, getattr(dcnv3, self.core_op)):
+                    m._reset_parameters()
         else:
             assert 'checkpoint' in self.init_cfg, f'Only support ' \
                                                   f'specify `Pretrained` in ' \
@@ -534,6 +549,10 @@ class FocalNet(BaseModule):
 
             # load state_dict
             self.load_state_dict(state_dict, strict=False)
+
+    def _init_deform_weights(self, m):
+        if isinstance(m, getattr(dcnv3, self.core_op)):
+            m._reset_parameters()
 
     def forward(self, x):
         """Forward function."""
