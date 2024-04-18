@@ -87,10 +87,10 @@ class FocalModulation(BaseModule):
                         stride=1,
                         pad=kernel_size // 2,
                         dilation=1,
-                        group=dim,
+                        group=dim // 4,
                         offset_scale=1.0,
                         act_layer='GELU',
-                        norm_layer=None,
+                        norm_layer='LN',
                         dw_kernel_size=None,  # for InternImage-H/G
                         center_feature_scale=False,
                         use_dcn_v4_op=False)  # for InternImage-H/G
@@ -375,7 +375,7 @@ class FocalNet(BaseModule):
                  out_indices=(0, 1, 2, 3),
                  frozen_stages=-1,
                  focal_levels=[2, 2, 2, 2],
-                 focal_windows=[9, 9, 9, 9],
+                 focal_windows=[3, 3, 3, 3],
                  use_conv_embed=False,
                  use_layerscale=False,
                  use_checkpoint=False,
@@ -440,7 +440,8 @@ class FocalNet(BaseModule):
                 focal_level=focal_levels[i_layer],
                 use_conv_embed=use_conv_embed,
                 use_layerscale=use_layerscale,
-                use_checkpoint=use_checkpoint)
+                use_checkpoint=use_checkpoint,
+            core_op=self.core_op)
             self.layers.append(layer)
 
         num_features = [int(embed_dim * 2 ** i) for i in range(self.num_layers)]
@@ -485,7 +486,7 @@ class FocalNet(BaseModule):
                     trunc_normal_init(m, std=.02, bias=0.)
                 elif isinstance(m, nn.LayerNorm):
                     constant_init(m, val=1.0, bias=0.)
-                elif isinstance(m, getattr(dcnv3, self.core_op)):
+                elif isinstance(m, self.core_op):
                     m._reset_parameters()
         else:
             assert 'checkpoint' in self.init_cfg, f'Only support ' \
