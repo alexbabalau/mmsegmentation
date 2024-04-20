@@ -81,19 +81,23 @@ class FocalModulation(BaseModule):
         for k in range(self.focal_level):
             kernel_size = self.focal_factor * k + self.focal_window
             self.focal_layers.append(
-                    core_op(
-                        channels=dim,
-                        kernel_size=kernel_size,
-                        stride=1,
-                        pad=kernel_size // 2,
-                        dilation=1,
-                        group=dim // 4,
-                        offset_scale=1.0,
-                        act_layer='GELU',
-                        norm_layer='LN',
-                        dw_kernel_size=None,  # for InternImage-H/G
-                        center_feature_scale=False,
-                        use_dcn_v4_op=False)  # for InternImage-H/G
+                    nn.Sequential(
+                        #nn.LayerNorm(dim),
+                        core_op(
+                            channels=dim,
+                            kernel_size=kernel_size,
+                            stride=1,
+                            pad=kernel_size // 2,
+                            dilation=1,
+                            group=1,
+                            offset_scale=1.0,
+                            act_layer='GELU',
+                            norm_layer='BN',
+                            dw_kernel_size=None,  # for InternImage-H/G
+                            center_feature_scale=False,
+                            use_dcn_v4_op=False)
+                    )
+                      # for InternImage-H/G
                 )
 
     def forward(self, x):
@@ -109,7 +113,11 @@ class FocalModulation(BaseModule):
 
         ctx_all = 0
         for l in range(self.focal_level):
-            ctx = self.focal_layers[l](ctx)
+            ctx_reshaped = ctx.permute(0, 2, 3, 1)
+            ctx_reshaped = self.focal_layers[l](ctx_reshaped)
+            print(ctx_reshaped)
+            ctx = ctx_reshaped.permute(0, 3, 1, 2)
+            #print(ctx)
             ctx_all = ctx_all + ctx * gates[:, l:l + 1]
         ctx_global = self.act(ctx.mean(2, keepdim=True).mean(3, keepdim=True))
         ctx_all = ctx_all + ctx_global * gates[:, self.focal_level:]

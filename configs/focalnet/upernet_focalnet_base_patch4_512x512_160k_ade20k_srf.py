@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/upernet_focalnet.py', '../_base_/datasets/ade20k.py',
-    '../_base_/default_runtime.py', '../_base_/schedules/schedule_160k.py'
+    '../_base_/default_runtime.py', '../_base_/schedules/schedule_320k.py'
 ]
 model = dict(
     backbone=dict(
