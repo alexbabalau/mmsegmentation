@@ -79,7 +79,7 @@ class FocalModulation(BaseModule):
             self.ln = nn.LayerNorm(dim)
 
         for k in range(self.focal_level):
-            kernel_size = self.focal_factor * k + self.focal_window
+            kernel_size = self.focal_window
             self.focal_layers.append(
                     nn.Sequential(
                         #nn.LayerNorm(dim),
@@ -115,7 +115,7 @@ class FocalModulation(BaseModule):
         for l in range(self.focal_level):
             ctx_reshaped = ctx.permute(0, 2, 3, 1)
             ctx_reshaped = self.focal_layers[l](ctx_reshaped)
-            print(ctx_reshaped)
+            #print(ctx_reshaped.grad)
             ctx = ctx_reshaped.permute(0, 3, 1, 2)
             #print(ctx)
             ctx_all = ctx_all + ctx * gates[:, l:l + 1]
