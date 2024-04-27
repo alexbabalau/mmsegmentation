@@ -22,6 +22,29 @@ from mmengine.utils import to_2tuple
 
 from ops_dcnv3 import modules as dcnv3
 
+def build_norm_layer(dim,
+                     norm_layer,
+                     in_format='channels_last',
+                     out_format='channels_last',
+                     eps=1e-6):
+    layers = []
+    if norm_layer == 'BN':
+        if in_format == 'channels_last':
+            layers.append(to_channels_first())
+        layers.append(nn.BatchNorm2d(dim))
+        if out_format == 'channels_last':
+            layers.append(to_channels_last())
+    elif norm_layer == 'LN':
+        if in_format == 'channels_first':
+            layers.append(to_channels_last())
+        layers.append(nn.LayerNorm(dim, eps=eps))
+        if out_format == 'channels_first':
+            layers.append(to_channels_first())
+    else:
+        raise NotImplementedError(
+            f'build_norm_layer does not support {norm_layer}')
+    return nn.Sequential(*layers)
+
 
 class Mlp(BaseModule):
     """ Multilayer perceptron."""
@@ -41,6 +64,58 @@ class Mlp(BaseModule):
         x = self.drop(x)
         x = self.fc2(x)
         x = self.drop(x)
+        return x
+
+
+class FocalContextGathering(BaseModule):
+    def __init__(self, dim, kernel_size=3,
+                            stride=1,
+                            pad=1,
+                            dilation=1,
+                            group=1,
+                            offset_scale=1.0,
+                            drop_path_rate=0.2,
+                            act_layer='GELU',
+                            norm_layer='LN',
+                            dw_kernel_size=None,  # for InternImage-H/G
+                            center_feature_scale=False,
+                            use_dcn_v4_op=False):
+        self.dim = dim
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.pad = pad
+        self.dilation = dilation
+        self.group = group
+        self.offset_scale = offset_scale
+        self.use_dcn_v4_op = use_dcn_v4_op
+        self.dw_kernel_size = dw_kernel_size
+        self.center_feature_scale = center_feature_scale
+        self.act_layer = act_layer
+        self.norm_layer = norm_layer
+        self.drop_path = DropPath(drop_path_rate) if drop_path_rate > 0. \
+            else nn.Identity()
+
+        self.norm1 = build_norm_layer(dim, 'LN')
+        self.norm2 = build_norm_layer(dim, 'LN')
+
+        self.dcn = core_op(
+            channels=channels,
+            kernel_size=3,
+            stride=1,
+            pad=1,
+            dilation=1,
+            group=groups,
+            offset_scale=offset_scale,
+            act_layer=act_layer,
+            norm_layer=norm_layer,
+            dw_kernel_size=dw_kernel_size,  # for InternImage-H/G
+            center_feature_scale=center_feature_scale,
+            use_dcn_v4_op=use_dcn_v4_op)  # for InternImage-H/G
+
+
+    def forward(self, x):
+        x = x + self.drop_path(self.dcn(self.norm1(x)))
+        x = x + self.drop_path(self.mlp(self.norm2(x)))
         return x
 
 
@@ -81,23 +156,19 @@ class FocalModulation(BaseModule):
         for k in range(self.focal_level):
             kernel_size = self.focal_window
             self.focal_layers.append(
-                    nn.Sequential(
-                        #nn.LayerNorm(dim),
-                        core_op(
-                            channels=dim,
-                            kernel_size=kernel_size,
-                            stride=1,
-                            pad=kernel_size // 2,
-                            dilation=1,
-                            group=1,
-                            offset_scale=1.0,
-                            act_layer='GELU',
-                            norm_layer='BN',
-                            dw_kernel_size=None,  # for InternImage-H/G
-                            center_feature_scale=False,
-                            use_dcn_v4_op=False)
-                    )
-                      # for InternImage-H/G
+                        FocalContextGathering(dim,
+                                              kernel_size=kernel_size,
+                                              stride=1,
+                                              pad=kernel_size//2,
+                                              dilation=1,
+                                              group=1,
+                                              offset_scale=1.0,
+                                              act_layer='GELU',
+                                              norm_layer='LN',
+                                              dw_kernel_size=None,  # for InternImage-H/G
+                                              center_feature_scale=False,
+                                              use_dcn_v4_op=False
+                                              )
                 )
 
     def forward(self, x):
