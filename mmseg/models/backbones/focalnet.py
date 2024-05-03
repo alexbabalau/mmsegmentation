@@ -78,11 +78,12 @@ class FocalModulation(BaseModule):
 
         for k in range(self.focal_level):
             kernel_size = self.focal_window
+            dilation = self.focal_factor * k + 1
             self.focal_layers.append(
                 nn.Sequential(
                     nn.Conv2d(dim, dim, kernel_size=kernel_size, stride=1, groups=dim,
-                              dilation=self.focal_factor * k + 1,
-                              padding=kernel_size // 2, bias=False),
+                              dilation=dilation,
+                              padding=(dilation * (kernel_size - 1)) // 2, bias=False),
                     nn.GELU(),
                 )
             )
