@@ -80,7 +80,10 @@ class FocalContextGathering(BaseModule):
                             norm_layer='LN',
                             dw_kernel_size=None,  # for InternImage-H/G
                             center_feature_scale=False,
-                            use_dcn_v4_op=False):
+                            use_dcn_v4_op=False,
+                 core_op=None
+                 ):
+        super().__init__(init_cfg=None)
         self.dim = dim
         self.kernel_size = kernel_size
         self.stride = stride
@@ -103,12 +106,12 @@ class FocalContextGathering(BaseModule):
                                        requires_grad=True)
 
         self.dcn = core_op(
-            channels=channels,
+            channels=dim,
             kernel_size=kernel_size,
             stride=stride,
             pad=pad,
             dilation=dilation,
-            group=groups,
+            group=group,
             offset_scale=offset_scale,
             act_layer=act_layer,
             norm_layer=norm_layer,
@@ -171,7 +174,8 @@ class FocalModulation(BaseModule):
                                               norm_layer='LN',
                                               dw_kernel_size=None,  # for InternImage-H/G
                                               center_feature_scale=False,
-                                              use_dcn_v4_op=False
+                                              use_dcn_v4_op=False,
+                                              core_op=core_op
                                               )
                 )
 
@@ -473,7 +477,7 @@ class FocalNet(BaseModule):
         self.patch_norm = patch_norm
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
-        self.core_op = getattr(dcnv3, 'DCNv3')
+        self.core_op = getattr(dcnv3, 'DCNv3_pytorch')
 
         if isinstance(pretrain_img_size, int):
             pretrain_img_size = to_2tuple(pretrain_img_size)
