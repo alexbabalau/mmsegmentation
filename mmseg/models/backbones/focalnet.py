@@ -116,8 +116,7 @@ class FocalContextGathering(BaseModule):
             act_layer=act_layer,
             norm_layer=norm_layer,
             dw_kernel_size=dw_kernel_size,  # for InternImage-H/G
-            center_feature_scale=center_feature_scale,
-            use_dcn_v4_op=use_dcn_v4_op)  # for InternImage-H/G
+            center_feature_scale=center_feature_scale)  # for InternImage-H/G
 
 
     def forward(self, x):
