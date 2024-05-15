@@ -177,7 +177,6 @@ class ShiftWindowMSA(BaseModule):
             proj_drop_rate=proj_drop_rate,
             init_cfg=None)
 
-        self.drop = build_dropout(dropout_layer)
 
     def forward(self, query, hw_shape):
         B, L, C = query.shape
@@ -224,8 +223,37 @@ class ShiftWindowMSA(BaseModule):
 
         x = x.view(B, H * W, C)
 
-        x = self.drop(x)
         return x
+    def window_reverse(self, windows, H, W):
+        """
+        Args:
+            windows: (num_windows*B, window_size, window_size, C)
+            H (int): Height of image
+            W (int): Width of image
+        Returns:
+            x: (B, H, W, C)
+        """
+        window_size = self.window_size
+        B = int(windows.shape[0] / (H * W / window_size / window_size))
+        x = windows.view(B, H // window_size, W // window_size, window_size,
+                         window_size, -1)
+        x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
+        return x
+
+    def window_partition(self, x):
+        """
+        Args:
+            x: (B, H, W, C)
+        Returns:
+            windows: (num_windows*B, window_size, window_size, C)
+        """
+        B, H, W, C = x.shape
+        window_size = self.window_size
+        x = x.view(B, H // window_size, window_size, W // window_size,
+                   window_size, C)
+        windows = x.permute(0, 1, 3, 2, 4, 5).contiguous()
+        windows = windows.view(-1, window_size, window_size, C)
+        return windows
 
 def build_norm_layer(dim,
                      norm_layer,
@@ -372,10 +400,10 @@ class FocalModulation(BaseModule):
 
         ctx_all = 0
         for l in range(self.focal_level):
-            ctx_reshaped = ctx.permute(0, 2, 3, 1).contiguous()
-            ctx_reshaped = self.focal_layers[l](ctx_reshaped)
+            ctx_reshaped = ctx.permute(0, 2, 3, 1).view(B, nH * nW, C).contiguous()
+            ctx_reshaped = self.focal_layers[l](ctx_reshaped, (nH, nW))
             #print(ctx_reshaped.grad)
-            ctx = ctx_reshaped.permute(0, 3, 1, 2).contiguous()
+            ctx = ctx_reshaped.view(B, nH, nW, C).permute(0, 3, 1, 2).contiguous()
             #print(ctx)
             ctx_all = ctx_all + ctx * gates[:, l:l + 1]
         ctx_global = self.act(ctx.mean(2, keepdim=True).mean(3, keepdim=True))
