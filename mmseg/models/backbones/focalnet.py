@@ -20,7 +20,6 @@ from mmengine.model.weight_init import (constant_init, trunc_normal_,
 from mmengine.runner import CheckpointLoader
 from mmengine.utils import to_2tuple
 
-from ops_dcnv3 import modules as dcnv3
 
 class WindowMSA(BaseModule):
     """Window based multi-head self-attention (W-MSA) module with relative
@@ -685,7 +684,7 @@ class FocalNet(BaseModule):
         self.patch_norm = patch_norm
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
-        self.core_op = getattr(dcnv3, 'DCNv3_pytorch')
+        self.core_op = None
 
         if isinstance(pretrain_img_size, int):
             pretrain_img_size = to_2tuple(pretrain_img_size)
@@ -781,8 +780,6 @@ class FocalNet(BaseModule):
                     trunc_normal_init(m, std=.02, bias=0.)
                 elif isinstance(m, nn.LayerNorm):
                     constant_init(m, val=1.0, bias=0.)
-                elif isinstance(m, self.core_op):
-                    m._reset_parameters()
         else:
             assert 'checkpoint' in self.init_cfg, f'Only support ' \
                                                   f'specify `Pretrained` in ' \
