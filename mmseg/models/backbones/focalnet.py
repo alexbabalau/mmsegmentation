@@ -385,15 +385,14 @@ class FocalModulation(BaseModule):
             kernel_size = self.focal_window + k * self.focal_factor
             self.focal_layers.append(
                 NeighborhoodAttention(
-                    dim,
+                    1,
                     kernel_size=kernel_size,
                     dilation=1,
-                    num_heads=4,
+                    num_heads=1,
                     qkv_bias=True,
                     qk_scale=None,
                     attn_drop=0.0,
-                    proj_drop=0.0,
-                    **extra_args,
+                    proj_drop=0.0
                 )
             )
 
@@ -410,10 +409,10 @@ class FocalModulation(BaseModule):
 
         ctx_all = 0
         for l in range(self.focal_level):
-            ctx_reshaped = ctx.view(B * C, 1, nH, nW).permute(0, 2, 3, 1).view(B * C, nH * nW, 1).contiguous()
-            ctx_reshaped = self.focal_layers[l](ctx_reshaped, (nH, nW))
+            ctx_reshaped = ctx.reshape(B * C, 1, nH, nW).permute(0, 2, 3, 1).contiguous()
+            ctx_reshaped = self.focal_layers[l](ctx_reshaped)
             #print(ctx_reshaped.grad)
-            ctx = ctx_reshaped.view(B * C, nH, nW, 1).permute(0, 3, 1, 2).view(B, C, nH, nW).contiguous()
+            ctx = ctx_reshaped.permute(0, 3, 1, 2).reshape(B, C, nH, nW).contiguous()
             #print(ctx)
             ctx_all = ctx_all + ctx * gates[:, l:l + 1]
         ctx_global = self.act(ctx.mean(2, keepdim=True).mean(3, keepdim=True))
