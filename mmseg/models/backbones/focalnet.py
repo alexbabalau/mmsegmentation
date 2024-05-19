@@ -382,12 +382,13 @@ class FocalModulation(BaseModule):
             self.ln = nn.LayerNorm(dim)
 
         for k in range(self.focal_level):
-            kernel_size = self.focal_window + k * self.focal_factor
+            kernel_size = self.focal_window
+            dilation = self.focal_factor * k + 1
             self.focal_layers.append(
                 NeighborhoodAttention(
                     1,
                     kernel_size=kernel_size,
-                    dilation=1,
+                    dilation=dilation,
                     num_heads=1,
                     qkv_bias=True,
                     qk_scale=None,
