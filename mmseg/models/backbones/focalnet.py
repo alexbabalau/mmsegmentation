@@ -383,18 +383,25 @@ class FocalModulation(BaseModule):
 
         for k in range(self.focal_level):
             kernel_size = self.focal_window + k * self.focal_factor
-            self.focal_layers.append(
-                NeighborhoodAttention(
-                    1,
-                    kernel_size=kernel_size,
-                    dilation=1,
-                    num_heads=1,
-                    qkv_bias=True,
-                    qk_scale=None,
-                    attn_drop=0.0,
-                    proj_drop=0.0
+            if k == 1:
+                self.focal_layers.append(
+                    NeighborhoodAttention(
+                        1,
+                        kernel_size=kernel_size,
+                        dilation=1,
+                        num_heads=1,
+                        qkv_bias=True,
+                        qk_scale=None,
+                        attn_drop=0.0,
+                        proj_drop=0.0
+                    )
                 )
-            )
+            else:
+                self.focal_layers.append(nn.Sequential(
+                    nn.Conv2d(dim, dim, kernel_size=kernel_size, stride=1, groups=dim,
+                              padding=kernel_size // 2, bias=False),
+                    nn.GELU()
+                ))
 
     def forward(self, x):
         """ Forward function.
