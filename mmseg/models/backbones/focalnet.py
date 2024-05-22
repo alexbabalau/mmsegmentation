@@ -385,10 +385,10 @@ class FocalModulation(BaseModule):
             kernel_size = self.focal_window + k * self.focal_factor
             self.focal_layers.append(
                 NeighborhoodAttention(
-                    4,
+                    1,
                     kernel_size=kernel_size,
                     dilation=1,
-                    num_heads=4,
+                    num_heads=1,
                     qkv_bias=True,
                     qk_scale=None,
                     attn_drop=0.0,
