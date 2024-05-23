@@ -385,16 +385,20 @@ class FocalModulation(BaseModule):
             kernel_size = self.focal_window
             dilation = self.focal_factor * k + 1
             self.focal_layers.append(
-                NeighborhoodAttention(
-                    1,
-                    kernel_size=kernel_size,
-                    dilation=dilation,
-                    num_heads=1,
-                    qkv_bias=True,
-                    qk_scale=None,
-                    attn_drop=0.0,
-                    proj_drop=0.0
+                    nn.Sequential(NeighborhoodAttention(
+                        1,
+                        kernel_size=kernel_size,
+                        dilation=dilation,
+                        num_heads=1,
+                        qkv_bias=True,
+                        qk_scale=None,
+                        attn_drop=0.0,
+                        proj_drop=0.0
+                    ),
+                    nn.GELU()
+                    #nn.LayerNorm(1)
                 )
+
             )
 
     def forward(self, x):
