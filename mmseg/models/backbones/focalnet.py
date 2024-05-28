@@ -383,7 +383,7 @@ class FocalModulation(BaseModule):
 
         for k in range(self.focal_level):
             kernel_size = self.focal_window + k * self.focal_factor
-            if k == 1:
+            if k == 0:
                 self.focal_layers.append(
                     NeighborhoodAttention(
                         64,
@@ -416,7 +416,7 @@ class FocalModulation(BaseModule):
 
         ctx_all = 0
         for l in range(self.focal_level):
-            if l == 1:
+            if l == 0:
                 ctx_reshaped = ctx.reshape(B * C//64, 64, nH, nW).permute(0, 2, 3, 1).contiguous()
                 ctx_reshaped = self.focal_layers[l](ctx_reshaped)
                 #print(ctx_reshaped.grad)
