@@ -416,7 +416,7 @@ class FocalModulation(BaseModule):
 
         ctx_all = 0
         for l in range(self.focal_level):
-            if l == 0:
+            if l == 1:
                 ctx_reshaped = ctx.reshape(B * C//64, 64, nH, nW).permute(0, 2, 3, 1).contiguous()
                 ctx_reshaped = self.focal_layers[l](ctx_reshaped)
                 #print(ctx_reshaped.grad)
